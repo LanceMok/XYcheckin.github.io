@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>軒揚數理教師打卡系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .glass-effect { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        .punch-btn { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .punch-btn:active { transform: scale(0.95); }
+        .gradient-bg { background: radial-gradient(circle at top left, #f8fafc 0%, #f1f5f9 100%); }
+        .tab-active { color: #3b82f6; border-bottom: 3px solid #3b82f6; }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+        .shake { animation: shake 0.4s ease-in-out; border-color: #f43f5e !important; }
+
+        @keyframes stroke { 100% { stroke-dashoffset: 0; } }
+        @keyframes scale { 0%, 100% { transform: none; } 50% { transform: scale3d(1.1, 1.1, 1); } }
+        @keyframes fill { 100% { box-shadow: inset 0px 0px 0px 50px #10b981; } }
+        .checkmark { width: 80px; height: 80px; border-radius: 50%; display: block; stroke-width: 4; stroke: #fff; stroke-miterlimit: 10; box-shadow: inset 0px 0px 0px #10b981; animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both; }
+        .checkmark__circle { stroke-dasharray: 166; stroke-dashoffset: 166; stroke-width: 4; stroke-miterlimit: 10; stroke: #10b981; fill: none; animation: stroke .6s cubic-bezier(0.65, 0, 0.45, 1) forwards; }
+        .checkmark__check { transform-origin: 50% 50%; stroke-dasharray: 48; stroke-dashoffset: 48; animation: stroke .3s cubic-bezier(0.65, 0, 0.45, 1) .8s forwards; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen text-slate-900 overflow-x-hidden">
+
+    <!-- 頂部導覽 -->
+    <nav class="fixed top-0 inset-x-0 z-40 px-6 py-6 flex justify-between items-center pointer-events-none">
+        <div class="flex items-center gap-3 glass-effect px-4 py-2 rounded-full border border-white/50 shadow-sm pointer-events-auto">
+            <div id="statusDot" class="w-2 h-2 rounded-full bg-slate-300 transition-colors"></div>
+            <span id="statusText" class="text-[10px] font-bold text-slate-400 tracking-tighter uppercase">定位檢查中...</span>
+        </div>
+        <div class="flex gap-2 pointer-events-auto">
+            <button onclick="switchView('admin')" class="w-10 h-10 glass-effect rounded-full flex items-center justify-center text-slate-500 border border-white/50 shadow-sm active:bg-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- 打卡視圖 -->
+    <main id="punchView" class="max-w-md mx-auto pt-28 pb-10 px-6 space-y-8">
+        <div class="text-center space-y-2">
+            <h1 class="text-5xl font-black tracking-tighter text-slate-800">軒揚數理</h1>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.5em]">教師雲端打卡系統</p>
+        </div>
+
+        <div id="authAlert" class="hidden bg-rose-50 border border-rose-200 p-4 rounded-2xl">
+            <p class="text-rose-600 text-sm font-bold">⚠️ 系統偵測到未啟動「匿名登入」，請聯繫管理員前往 Firebase Console 開啟。</p>
+        </div>
+
+        <div class="space-y-6">
+            <div class="space-y-2">
+                <label class="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Teacher Name</label>
+                <input id="teacherName" type="text" placeholder="輸入姓名" class="w-full glass-effect p-6 rounded-[2rem] text-xl font-bold border-2 border-transparent shadow-inner outline-none transition-all focus:bg-white">
+                <p id="nameError" class="hidden px-4 text-xs font-bold text-rose-500 italic">⚠️ 親愛的老師，請先填寫您的姓名唷</p>
+            </div>
+
+            <div class="space-y-2">
+                <label class="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Branch Location</label>
+                <div class="flex gap-3">
+                    <div class="relative flex-1">
+                        <select id="locationSelect" class="w-full glass-effect p-6 rounded-[2rem] text-lg font-bold border border-white shadow-inner outline-none appearance-none"></select>
+                        <div class="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                    </div>
+                    <button onclick="toggleLocModal(true)" class="w-16 h-16 bg-blue-600 text-white rounded-[1.8rem] flex items-center justify-center shadow-lg active:scale-90">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4" /></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-5 pt-4">
+                <button onclick="handlePunch('上班打卡')" class="punch-btn bg-emerald-500 text-white p-10 rounded-[2.5rem] font-black text-2xl shadow-xl shadow-emerald-200/50 flex flex-col items-center">
+                    <span>上班打卡</span>
+                    <span class="text-[10px] opacity-60 font-bold tracking-widest uppercase italic">Start Duty</span>
+                </button>
+                <button onclick="handlePunch('下班打卡')" class="punch-btn bg-slate-900 text-white p-10 rounded-[2.5rem] font-black text-2xl shadow-xl shadow-slate-300/50 flex flex-col items-center">
+                    <span>下班打卡</span>
+                    <span class="text-[10px] opacity-60 font-bold tracking-widest uppercase italic">End Session</span>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- 打卡成功遮罩 -->
+    <section id="successScreen" class="hidden fixed inset-0 z-[60] bg-white/95 flex flex-col items-center justify-center">
+        <svg class="checkmark mb-8" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+            <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
+            <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        </svg>
+        <div class="text-center space-y-2">
+            <h2 id="successType" class="text-4xl font-black text-slate-800 tracking-tighter">打卡成功</h2>
+            <p class="text-slate-500 font-bold text-lg"><span id="successName" class="text-blue-600">老師</span>，辛苦了！</p>
+        </div>
+    </section>
+
+    <!-- 管理登入 -->
+    <section id="authView" class="hidden fixed inset-0 z-30 bg-slate-50/90 backdrop-blur-md flex items-center justify-center p-8">
+        <div class="w-full max-sm glass-effect rounded-[3rem] p-10 shadow-2xl border border-white">
+            <h3 class="font-black text-2xl mb-8 text-center uppercase tracking-tighter">Admin Access</h3>
+            <input id="adminPass" type="password" placeholder="••••••" class="w-full bg-white p-6 rounded-2xl text-center text-5xl font-mono tracking-widest outline-none border-2 focus:border-blue-500 mb-10">
+            <div class="flex gap-4">
+                <button onclick="switchView('punch')" class="flex-1 font-bold text-slate-400">返回</button>
+                <button onclick="verifyAdmin()" class="flex-[2] py-5 bg-blue-600 text-white rounded-2xl font-black">進入</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 管理看板 -->
+    <section id="adminView" class="hidden max-w-2xl mx-auto pt-28 p-6">
+        <div class="flex justify-between items-end mb-8">
+            <div>
+                <h2 class="text-4xl font-black italic tracking-tighter uppercase">Records</h2>
+                <p class="text-[10px] font-bold text-slate-400 tracking-widest">後台監控看板</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="openEditModal(null)" class="px-4 py-2 bg-emerald-500 text-white text-[10px] font-black rounded-full shadow-md uppercase">手動補登</button>
+                <button onclick="switchView('punch')" class="px-4 py-2 bg-slate-800 text-white text-[10px] font-black rounded-full uppercase">Logout</button>
+            </div>
+        </div>
+        <div id="teacherTabs" class="flex gap-2 overflow-x-auto no-scrollbar pb-4 border-b"></div>
+        <div id="logList" class="space-y-4 py-6 pb-24"></div>
+    </section>
+
+    <!-- 編輯彈窗 -->
+    <div id="editModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 id="editModalTitle" class="text-xl font-black">編輯紀錄</h3>
+                <button onclick="closeEditModal()" class="text-slate-400 p-2 text-2xl">✕</button>
+            </div>
+            <input id="editId" type="hidden">
+            <div class="space-y-4 max-h-[50vh] overflow-y-auto no-scrollbar">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 ml-2">教師姓名</label>
+                    <input id="editName" type="text" class="w-full p-4 bg-slate-50 rounded-xl border-2 border-slate-100 outline-none font-bold">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 ml-2">地點分院</label>
+                    <select id="editLoc" class="w-full p-4 bg-slate-50 rounded-xl border-2 border-slate-100 outline-none font-bold"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 ml-2">類型</label>
+                        <select id="editType" class="w-full p-4 bg-slate-50 rounded-xl border-2 border-slate-100 outline-none font-bold">
+                            <option value="上班打卡">上班打卡</option>
+                            <option value="下班打卡">下班打卡</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 ml-2">時間</label>
+                        <input id="editTime" type="datetime-local" class="w-full p-4 bg-slate-50 rounded-xl border-2 border-slate-100 outline-none font-bold text-xs">
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-col gap-3 pt-4">
+                <button onclick="doSave()" class="w-full py-4 bg-blue-600 text-white rounded-xl font-black shadow-lg">儲存變更</button>
+                <button id="delBtn" onclick="doDelete()" class="w-full py-4 bg-rose-50 text-rose-500 rounded-xl font-bold border-2 border-rose-100">確定要刪除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 地點視窗 -->
+    <div id="locModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+            <h3 class="text-2xl font-black text-center text-slate-800">新增地點</h3>
+            <input id="newLocInput" type="text" placeholder="輸入新增地點" class="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-blue-500 outline-none text-center font-bold">
+            <div class="flex gap-3">
+                <button onclick="toggleLocModal(false)" class="flex-1 py-4 font-bold text-slate-400">取消</button>
+                <button onclick="confirmAddLoc()" class="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg">確認</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // --- 靜態 Firebase 配置 ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-iTmN_rwJUWbNmbBiXva52dlNKyM4fSA",
+            authDomain: "lmteam-4f2db.firebaseapp.com",
+            projectId: "lmteam-4f2db",
+            storageBucket: "lmteam-4f2db.firebasestorage.app",
+            messagingSenderId: "765459964596",
+            appId: "1:765459964596:web:6e1898716b1e860952d7e3"
+        };
+
+        // 初始化
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const COLLECTION = 'attendance_records';
+        const APP_PATH_ID = 'sy-production-v1';
+
+        let currentUser = null;
+        let isVerified = false;
+        let allLogs = [];
+        let filterTeacher = 'ALL';
+        let currentPos = { lat: 0, lng: 0 };
+
+        const PRESET_LOCS = ['文星文理補習班（大社吉的堡）', '鳳翔文理補習班', '麥克亞綸文理補習班'];
+        let activeLocs = JSON.parse(localStorage.getItem('sy_loc_list')) || PRESET_LOCS;
+
+        window.switchView = (v) => {
+            ['punchView', 'authView', 'adminView'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            if(v === 'admin' && !isVerified) document.getElementById('authView').classList.remove('hidden');
+            else document.getElementById(v + 'View').classList.remove('hidden');
+        };
+
+        window.toggleLocModal = (show) => document.getElementById('locModal').classList.toggle('hidden', !show);
+
+        // 初始化函數
+        async function init() {
+            try {
+                // 強制檢查並嘗試登入
+                const userCredential = await signInAnonymously(auth);
+                currentUser = userCredential.user;
+                console.log("匿名登入成功:", currentUser.uid);
+                startSync();
+                document.getElementById('authAlert').classList.add('hidden');
+            } catch (error) {
+                console.error("Firebase 初始化失敗:", error);
+                if (error.code === 'auth/configuration-not-found') {
+                    document.getElementById('authAlert').classList.remove('hidden');
+                } else {
+                    alert("連線系統失敗，請檢查網路連線或專案設定: " + error.message);
+                }
+            }
+
+            refreshLocUI();
+            startGeoTracking();
+            const savedName = localStorage.getItem('sy_name_last');
+            if(savedName) document.getElementById('teacherName').value = savedName;
+        }
+
+        function startGeoTracking() {
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(p => {
+                    currentPos = { lat: p.coords.latitude, lng: p.coords.longitude };
+                    document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-emerald-500";
+                    document.getElementById('statusText').innerText = "定位已鎖定";
+                }, () => {
+                    document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-rose-500 animate-pulse";
+                    document.getElementById('statusText').innerText = "請開啟定位權限";
+                }, { enableHighAccuracy: true });
+            }
+        }
+
+        function refreshLocUI() {
+            const html = activeLocs.map(l => `<option value="${l}">${l}</option>`).join('');
+            document.getElementById('locationSelect').innerHTML = html;
+            document.getElementById('editLoc').innerHTML = html;
+        }
+
+        window.confirmAddLoc = () => {
+            const val = document.getElementById('newLocInput').value.trim();
+            if(val && !activeLocs.includes(val)) {
+                activeLocs.push(val);
+                localStorage.setItem('sy_loc_list', JSON.stringify(activeLocs));
+                refreshLocUI();
+            }
+            document.getElementById('locationSelect').value = val || activeLocs[0];
+            document.getElementById('newLocInput').value = '';
+            toggleLocModal(false);
+        };
+
+        window.handlePunch = async (type) => {
+            const name = document.getElementById('teacherName').value.trim();
+            if(!name) {
+                document.getElementById('teacherName').classList.add('shake');
+                document.getElementById('nameError').classList.remove('hidden');
+                setTimeout(() => document.getElementById('teacherName').classList.remove('shake'), 400);
+                return;
+            }
+            if(!currentUser) {
+                alert("⚠️ 系統尚未準備就緒。請確認 Firebase 控制台已開啟「匿名登入」功能。");
+                return;
+            }
+            localStorage.setItem('sy_name_last', name);
+            
+            try {
+                await addDoc(collection(db, 'artifacts', APP_PATH_ID, 'public', 'data', COLLECTION), {
+                    teacher: name,
+                    location: document.getElementById('locationSelect').value,
+                    type,
+                    timestamp: serverTimestamp(),
+                    clientTime: new Date().toISOString(),
+                    lat: currentPos.lat,
+                    lng: currentPos.lng,
+                    uid: currentUser.uid
+                });
+                showSuccess(name, type);
+            } catch (e) { 
+                console.error("寫入錯誤:", e);
+                alert("打卡失敗。請確認 Firestore 資料庫 Rules 規則已設為允許寫入。"); 
+            }
+        };
+
+        function showSuccess(name, type) {
+            const sc = document.getElementById('successScreen');
+            document.getElementById('successName').innerText = name;
+            document.getElementById('successType').innerText = type.replace('打卡', '成功');
+            sc.classList.remove('hidden');
+            sc.classList.add('flex');
+            setTimeout(() => {
+                sc.classList.remove('hidden');
+                sc.classList.remove('flex');
+            }, 2500);
+        }
+
+        window.verifyAdmin = () => {
+            if(document.getElementById('adminPass').value === "860201") {
+                isVerified = true;
+                switchView('admin');
+            } else alert("密碼錯誤");
+        };
+
+        function startSync() {
+            if (!currentUser) return;
+            const q = collection(db, 'artifacts', APP_PATH_ID, 'public', 'data', COLLECTION);
+            onSnapshot(q, (snap) => {
+                allLogs = [];
+                snap.forEach(d => allLogs.push({id: d.id, ...d.data()}));
+                allLogs.sort((a,b) => new Date(b.clientTime) - new Date(a.clientTime));
+                renderAdmin();
+            }, (error) => {
+                console.error("即時同步失敗:", error);
+            });
+        }
+
+        function renderAdmin() {
+            const listWrap = document.getElementById('logList');
+            if(!listWrap) return;
+            const teachers = [...new Set(allLogs.map(l => l.teacher))];
+            
+            document.getElementById('teacherTabs').innerHTML = `<button onclick="setFilter('ALL')" class="whitespace-nowrap px-4 py-2 font-black text-sm ${filterTeacher==='ALL'?'tab-active':'text-slate-400'}">全部</button>` + teachers.map(t => `<button onclick="setFilter('${t}')" class="whitespace-nowrap px-4 py-2 font-black text-sm ${filterTeacher===t?'tab-active':'text-slate-400'}">${t}</button>`).join('');
+            
+            const filtered = filterTeacher === 'ALL' ? allLogs : allLogs.filter(l => l.teacher === filterTeacher);
+            listWrap.innerHTML = filtered.map(log => `
+                <div onclick="openEditModal('${log.id}')" class="glass-effect p-5 rounded-[1.8rem] border border-white flex justify-between items-center shadow-sm active:scale-95 transition-all">
+                    <div>
+                        <div class="font-black text-slate-800 text-lg">${log.teacher}</div>
+                        <div class="text-[10px] text-blue-500 font-bold uppercase">${log.location}</div>
+                        <div class="text-[9px] text-slate-400">${new Date(log.clientTime).toLocaleString('zh-TW')}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-black ${log.type.includes('上班')?'text-emerald-500':'text-rose-500'} text-lg">${log.type}</div>
+                    </div>
+                </div>`).join('');
+        }
+
+        window.setFilter = (t) => { filterTeacher = t; renderAdmin(); };
+
+        window.openEditModal = (id) => {
+            const data = id ? allLogs.find(l => l.id === id) : null;
+            document.getElementById('editId').value = id || '';
+            document.getElementById('editModalTitle').innerText = id ? "編輯紀錄" : "手動補登";
+            document.getElementById('editName').value = data ? data.teacher : "";
+            document.getElementById('editLoc').value = data ? data.location : activeLocs[0];
+            document.getElementById('editType').value = data ? data.type : "上班打卡";
+            
+            const timeVal = data ? new Date(data.clientTime) : new Date();
+            timeVal.setMinutes(timeVal.getMinutes() - timeVal.getTimezoneOffset());
+            document.getElementById('editTime').value = timeVal.toISOString().slice(0, 16);
+            document.getElementById('delBtn').style.display = id ? "block" : "none";
+            document.getElementById('editModal').classList.remove('hidden');
+        };
+
+        window.closeEditModal = () => document.getElementById('editModal').classList.add('hidden');
+
+        window.doDelete = async () => {
+            const docId = document.getElementById('editId').value;
+            if(confirm("確定要刪除這筆紀錄嗎？")) {
+                await deleteDoc(doc(db, 'artifacts', APP_PATH_ID, 'public', 'data', COLLECTION, docId));
+                closeEditModal();
+            }
+        };
+
+        window.doSave = async () => {
+            const id = document.getElementById('editId').value;
+            const payload = {
+                teacher: document.getElementById('editName').value.trim(),
+                location: document.getElementById('editLoc').value,
+                type: document.getElementById('editType').value,
+                clientTime: new Date(document.getElementById('editTime').value).toISOString()
+            };
+            try {
+                if(id) await updateDoc(doc(db, 'artifacts', APP_PATH_ID, 'public', 'data', COLLECTION, id), payload);
+                else {
+                    payload.timestamp = serverTimestamp();
+                    payload.uid = currentUser.uid;
+                    await addDoc(collection(db, 'artifacts', APP_PATH_ID, 'public', 'data', COLLECTION), payload);
+                }
+                closeEditModal();
+            } catch (e) { alert("儲存失敗: " + e.message); }
+        };
+
+        // 啟動
+        init();
+    </script>
+</body>
+</html>
