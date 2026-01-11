@@ -148,7 +148,7 @@
         const PRESET_LOCS = ['文星文理補習班（大社吉的堡）', '鳳翔文理補習班', '麥克亞綸文理補習班'];
         let activeLocs = JSON.parse(localStorage.getItem('sy_locs_v2')) || PRESET_LOCS;
         let currentGeo = null;
-        let historyData = null; // 暫存查詢到的歷史紀錄
+        let historyData = null; 
 
         const hide = (id) => document.getElementById(id).classList.add('hidden');
         const show = (id) => document.getElementById(id).classList.remove('hidden');
@@ -166,14 +166,11 @@
         function showFeedback(teacher, title) {
             const overlay = document.getElementById('successOverlay');
             document.getElementById('successTitle').innerText = title;
-            document.getElementById('successTeacher').innerText = "G'day, fella!";
+            document.getElementById('successTeacher').innerText = teacher + "，辛苦了！";
             overlay.classList.remove('hidden');
             setTimeout(() => overlay.classList.add('hidden'), 3000);
         }
 
-        /**
-         * 執行歷史紀錄查詢
-         */
         async function fetchHistory() {
             const nameEl = document.getElementById('teacherName');
             const name = nameEl.value.trim();
@@ -192,13 +189,10 @@
             document.getElementById('historyList').innerHTML = '<p class="text-center text-slate-400 py-10 font-bold italic">資料載入中...</p>';
             
             try {
-                const params = new URLSearchParams({ teacher: name });
-                const finalUrl = `${GAS_URL}?${params.toString()}`;
-                
-                const response = await fetch(finalUrl);
+                const response = await fetch(`${GAS_URL}?teacher=${encodeURIComponent(name)}`);
                 const text = await response.text();
                 
-                // 解析 JSON（處理 GAS 可能夾帶的額外字串）
+                // 解析 JSON
                 const jsonStartIndex = text.indexOf('{');
                 const jsonEndIndex = text.lastIndexOf('}') + 1;
                 if (jsonStartIndex === -1) throw new Error("無效的資料格式");
@@ -220,7 +214,7 @@
                 document.getElementById('historyList').innerHTML = `
                     <div class="text-center py-20 px-6">
                         <p class="text-rose-500 font-bold">查詢失敗</p>
-                        <p class="text-slate-400 text-xs mt-2">請確認後端腳本已正確部署為「任何人」均可存取</p>
+                        <p class="text-slate-400 text-xs mt-2">請確認後端腳本已正確部署</p>
                     </div>
                 `;
             } finally {
@@ -240,7 +234,6 @@
         }
 
         function renderHistory(monthLabel) {
-            // 切換 Tab 樣式
             document.querySelectorAll('.month-tab').forEach(btn => {
                 const isActive = btn.innerText.trim() === monthLabel;
                 btn.classList.toggle('active', isActive);
@@ -257,7 +250,7 @@
             }
 
             list.innerHTML = records.map(r => `
-                <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex justify-between items-center animate-modal-in">
+                <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex justify-between items-center">
                     <div class="space-y-1">
                         <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${r.time}</p>
                         <p class="text-lg font-bold text-slate-800">${r.location}</p>
@@ -306,7 +299,6 @@
             }
         }
 
-        // 事件綁定
         document.getElementById('verifyPwBtn').onclick = () => {
             const input = document.getElementById('adminPassword').value;
             if (input === ADMIN_PASSWORD) {
@@ -342,7 +334,6 @@
         document.getElementById('punchInBtn').onclick = () => handlePunch('上班打卡');
         document.getElementById('punchOutBtn').onclick = () => handlePunch('下班打卡');
 
-        // 定位邏輯
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(pos => {
                 currentGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) };
@@ -353,7 +344,6 @@
             }, { enableHighAccuracy: true });
         }
 
-        // 初始化
         refreshLocUI();
         const last = localStorage.getItem('sy_name_last');
         if (last) document.getElementById('teacherName').value = last;
